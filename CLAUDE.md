@@ -145,6 +145,16 @@ Pausar un `<audio>` no cierra el buffer de red: la conexión al stream queda abi
 
 Eso fuerza al elemento a soltar el buffer y cerrar la conexión. Importante para evitar leaks cuando el usuario navega o cuando cambiamos de estación.
 
+### Canvas 2D: context state, DPR y ResizeObserver
+
+Tres puntos a tener en cuenta cada vez que trabajemos con canvas:
+
+1. **Resetear `canvas.width` o `canvas.height` limpia TODO el context state**: la matriz de transformación vuelve a identidad, `fillStyle` se pierde, los paths acumulados también. Por eso cada vez que haya resize hay que volver a aplicar la transformación DPR y los gradientes se crean dentro del loop por barra (no se pueden cachear fuera porque una resize los invalidaría).
+
+2. **`setTransform(dpr, 0, 0, dpr, 0, 0)` vs `ctx.scale(dpr, dpr)`**: usar `setTransform` deja la matriz en estado explícito y no acumula si por error la función corre dos veces sin reset. `scale` acumula multiplicativamente, lo que lleva a bugs sutiles de escala creciente en refactors.
+
+3. **`ResizeObserver` dispara síncronamente al suscribir con el tamaño inicial, pero no antes del primer frame.** Hay una ventana de uno o dos frames donde el canvas podría dibujar en 0x0 si confiamos solo en el observer. La defensa es llamar manualmente a `resize()` ANTES de `observer.observe(container)`, así el primer tick ya tiene dimensiones correctas.
+
 ## Convenciones
 
 - **Idioma del código:** inglés para identificadores (variables, funciones, archivos, componentes). Comentarios en español cuando ayuden a entender decisiones de diseño o las trampas.
