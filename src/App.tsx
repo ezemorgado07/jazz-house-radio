@@ -1,5 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
 import { ThemeSwitcher } from './components/ThemeSwitcher'
+import { Visualizer } from './components/Visualizer/Visualizer'
 import { useAudioEngine } from './audio/useAudioEngine'
 
 function App() {
@@ -7,6 +8,7 @@ function App() {
     status,
     volume,
     isMuted,
+    analyserRef,
     loadLocalFile,
     togglePlay,
     toggleMute,
@@ -36,6 +38,8 @@ function App() {
             Setting up the studio...
           </p>
         </div>
+
+        <Visualizer analyserRef={analyserRef} isActive={status === 'playing'} />
 
         <section className="flex w-full flex-col gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 p-6 backdrop-blur-md">
           <label className="group inline-flex w-full cursor-pointer items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--glass)] px-4 py-3 text-sm text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]">
