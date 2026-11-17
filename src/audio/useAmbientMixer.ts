@@ -6,7 +6,6 @@ import type {
 } from '../types'
 import {
   generateBrownNoiseBuffer,
-  generateFireplaceBuffer,
   generatePinkNoiseBuffer,
 } from './noise'
 
@@ -33,18 +32,23 @@ export function useAmbientMixer(
 ): AmbientMixer {
   const [channels, setChannels] = useState<AmbientChannel[]>(CHANNEL_DEFAULTS)
 
-  // Centralizamos tracking: todo lo start-able (sources + LFOs) a allSourcesRef,
-  // todo lo conectable a allNodesRef. Cleanup itera sobre ambos.
-  // Los userGain de cada canal quedan en un map para que setChannelVolume
-  // los encuentre por id.
+  // Centralizamos tracking: todo lo start-able a allSourcesRef, todo lo
+  // conectable a allNodesRef. Los userGain por canal van en un map para que
+  // setChannelVolume los encuentre por id. Los timers de los schedulers van
+  // en sus propios refs para poder cancelarlos exactamente en el cleanup.
   const allSourcesRef = useRef<AudioScheduledSourceNode[]>([])
   const allNodesRef = useRef<AudioNode[]>([])
   const userGainsRef = useRef<UserGainMap>(emptyUserGains())
   const thunderTimerRef = useRef<number | null>(null)
+  const fireplaceCrackTimerRef = useRef<number | null>(null)
+  const coffeeSyllableTimersRef = useRef<Array<number | null>>([
+    null,
+    null,
+    null,
+  ])
   const isInitializedRef = useRef(false)
 
   const buildChannels = useCallback(async (): Promise<void> => {
-    // Guard sincrónico: dos sliders en el mismo tick no deben construir dos veces.
     if (isInitializedRef.current) return
     isInitializedRef.current = true
 
@@ -61,8 +65,7 @@ export function useAmbientMixer(
 
     // ============ RAIN ============
     // pink noise → highpass → modGain → userGain → master
-    // LFO 0.02Hz modula modGain para que la intensidad varíe sola.
-    // Thunder scheduler: cada 20-60s dispara un trueno grave.
+    // LFO 0.02Hz modula modGain. Thunder scheduler cada 12–18s.
     {
       const pinkBuf = generatePinkNoiseBuffer(ctx, BUFFER_SECONDS)
       const src = ctx.createBufferSource()
@@ -87,9 +90,9 @@ export function useAmbientMixer(
 
       const lfo = ctx.createOscillator()
       lfo.type = 'sine'
-      lfo.frequency.value = 0.02 // 1 ciclo cada 50s
+      lfo.frequency.value = 0.02
       const lfoGain = ctx.createGain()
-      lfoGain.gain.value = 0.4 // swing ±0.4 sobre el base 1.0 de modGain
+      lfoGain.gain.value = 0.4
       lfo.connect(lfoGain)
       lfoGain.connect(modGain.gain)
 
@@ -100,12 +103,8 @@ export function useAmbientMixer(
       nodes.push(src, filter, modGain, userGain, lfo, lfoGain)
       userGainsRef.current.rain = userGain
 
-      // Thunder: se re-agenda a sí mismo. El src del trueno no lo trackeamos
-      // porque tiene .stop(now+3.5) agendado y se auto-finaliza; si el
-      // cleanup corre mientras un trueno suena, al desconectar userGain
-      // deja de ser audible y termina su vida natural.
       const scheduleThunder = (): void => {
-        const delayMs = 20000 + Math.random() * 40000 // 20–60 s
+        const delayMs = 12000 + Math.random() * 6000 // 12–18 s
         thunderTimerRef.current = window.setTimeout(() => {
           const now = ctx.currentTime
           const length = Math.floor(ctx.sampleRate * 3)
@@ -128,8 +127,6 @@ export function useAmbientMixer(
 
           thunderSrc.connect(thunderFilter)
           thunderFilter.connect(envGain)
-          // Conectamos al userGain del canal rain: así el slider del usuario
-          // también controla cuánto suena el trueno.
           envGain.connect(userGain)
 
           thunderSrc.start(now)
@@ -142,37 +139,72 @@ export function useAmbientMixer(
     }
 
     // ============ FIREPLACE ============
-    // fireplace buffer (pink+crackles) → lowpass 2kHz → userGain → master
+    // Fondo constante: pink → lowpass 800Hz Q=0.5 → baseGain(0.15) → userGain
+    // Wood-crack scheduler cada 12–18s: burst corto de pink → bandpass
+    // 2800Hz Q=4 → envelope rápido (ataque 5ms, decay 300ms) → userGain.
     {
-      const buf = generateFireplaceBuffer(ctx, BUFFER_SECONDS)
+      const pinkBuf = generatePinkNoiseBuffer(ctx, BUFFER_SECONDS)
       const src = ctx.createBufferSource()
-      src.buffer = buf
+      src.buffer = pinkBuf
       src.loop = true
 
       const filter = ctx.createBiquadFilter()
       filter.type = 'lowpass'
-      filter.frequency.value = 2000
-      filter.Q.value = 0.7
+      filter.frequency.value = 800
+      filter.Q.value = 0.5
+
+      const baseGain = ctx.createGain()
+      baseGain.gain.value = 0.15
 
       const userGain = ctx.createGain()
       userGain.gain.value = 0
 
       src.connect(filter)
-      filter.connect(userGain)
+      filter.connect(baseGain)
+      baseGain.connect(userGain)
       userGain.connect(master)
 
       src.start(0)
-
       sources.push(src)
-      nodes.push(src, filter, userGain)
+      nodes.push(src, filter, baseGain, userGain)
       userGainsRef.current.fireplace = userGain
+
+      const scheduleWoodCrack = (): void => {
+        const delayMs = 12000 + Math.random() * 6000
+        fireplaceCrackTimerRef.current = window.setTimeout(() => {
+          const now = ctx.currentTime
+          // Buffer fresco por crack: cada click suena distinto en vez de
+          // repetir la misma forma de onda cada vez.
+          const crackBuf = generatePinkNoiseBuffer(ctx, 0.15)
+          const crackSrc = ctx.createBufferSource()
+          crackSrc.buffer = crackBuf
+          const crackFilter = ctx.createBiquadFilter()
+          crackFilter.type = 'bandpass'
+          crackFilter.frequency.value = 2800
+          crackFilter.Q.value = 4
+          const envGain = ctx.createGain()
+          envGain.gain.setValueAtTime(0.0001, now)
+          envGain.gain.linearRampToValueAtTime(0.5, now + 0.005)
+          envGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3)
+
+          crackSrc.connect(crackFilter)
+          crackFilter.connect(envGain)
+          envGain.connect(userGain)
+
+          crackSrc.start(now)
+          crackSrc.stop(now + 0.35)
+
+          scheduleWoodCrack()
+        }, delayMs)
+      }
+      scheduleWoodCrack()
     }
 
     // ============ COFFEE ============
-    // Capa base: brown noise → bandpass 500Hz → baseGain(0.5) → mixSum
-    // 3 capas de formantes: comparten UN pink buffer, cada una con bandpass
-    // estrecho + LFO propio modulando su gain → mixSum.
-    // mixSum → userGain → master
+    // Room tone: brown → bandpass 500Hz → baseGain(0.35) → userGain
+    // 3 voces basadas en sílabas: cada una tiene una fuente pink compartida,
+    // su propio bandpass (frecuencia cambia por sílaba) y un voiceGain con
+    // envelope ADR disparado por un scheduler independiente con pausas.
     {
       const brownBuf = generateBrownNoiseBuffer(ctx, BUFFER_SECONDS)
       const brownSrc = ctx.createBufferSource()
@@ -183,62 +215,93 @@ export function useAmbientMixer(
       brownFilter.frequency.value = 500
       brownFilter.Q.value = 0.9
       const baseGain = ctx.createGain()
-      baseGain.gain.value = 0.5
-
-      const mixSum = ctx.createGain()
-      mixSum.gain.value = 1.0
+      baseGain.gain.value = 0.35
       const userGain = ctx.createGain()
       userGain.gain.value = 0
 
       brownSrc.connect(brownFilter)
       brownFilter.connect(baseGain)
-      baseGain.connect(mixSum)
+      baseGain.connect(userGain)
+      userGain.connect(master)
+
       brownSrc.start(0)
-
       sources.push(brownSrc)
-      nodes.push(brownSrc, brownFilter, baseGain)
+      nodes.push(brownSrc, brownFilter, baseGain, userGain)
+      userGainsRef.current.coffee = userGain
 
-      // Mismo pink buffer para las 3 capas (más eficiente en memoria).
       const sharedPink = generatePinkNoiseBuffer(ctx, BUFFER_SECONDS)
-      const formantSpecs = [
-        { freq: 500, q: 8, base: 0.25, lfoFreq: 3.5, lfoAmp: 0.2 },
-        { freq: 1500, q: 10, base: 0.2, lfoFreq: 4.2, lfoAmp: 0.2 },
-        { freq: 2500, q: 12, base: 0.15, lfoFreq: 3.0, lfoAmp: 0.15 },
+      const voiceSpecs = [
+        { freqMin: 350, freqMax: 700, q: 10 },
+        { freqMin: 550, freqMax: 1100, q: 12 },
+        { freqMin: 1300, freqMax: 2700, q: 14 },
       ]
-      for (const spec of formantSpecs) {
-        const src = ctx.createBufferSource()
-        src.buffer = sharedPink
-        src.loop = true
+      const voiceFilters: BiquadFilterNode[] = []
+      const voiceGains: GainNode[] = []
+
+      for (const spec of voiceSpecs) {
+        const vSrc = ctx.createBufferSource()
+        vSrc.buffer = sharedPink
+        vSrc.loop = true
         const filter = ctx.createBiquadFilter()
         filter.type = 'bandpass'
-        filter.frequency.value = spec.freq
         filter.Q.value = spec.q
-        const formantGain = ctx.createGain()
-        formantGain.gain.value = spec.base
+        // Frecuencia inicial: central del rango. Se cambia por sílaba.
+        filter.frequency.value = (spec.freqMin + spec.freqMax) / 2
+        const voiceGain = ctx.createGain()
+        // exponentialRampToValueAtTime no acepta 0, usamos un valor minúsculo.
+        voiceGain.gain.value = 0.0001
 
-        src.connect(filter)
-        filter.connect(formantGain)
-        formantGain.connect(mixSum)
+        vSrc.connect(filter)
+        filter.connect(voiceGain)
+        voiceGain.connect(userGain)
 
-        const lfo = ctx.createOscillator()
-        lfo.type = 'sine'
-        lfo.frequency.value = spec.lfoFreq
-        const lfoGain = ctx.createGain()
-        lfoGain.gain.value = spec.lfoAmp
-        lfo.connect(lfoGain)
-        lfoGain.connect(formantGain.gain)
-
-        src.start(0)
-        lfo.start(0)
-
-        sources.push(src, lfo)
-        nodes.push(src, filter, formantGain, lfo, lfoGain)
+        vSrc.start(0)
+        sources.push(vSrc)
+        nodes.push(vSrc, filter, voiceGain)
+        voiceFilters.push(filter)
+        voiceGains.push(voiceGain)
       }
 
-      mixSum.connect(userGain)
-      userGain.connect(master)
-      nodes.push(mixSum, userGain)
-      userGainsRef.current.coffee = userGain
+      const scheduleNextSyllable = (voiceIdx: number): void => {
+        const now = ctx.currentTime
+        const spec = voiceSpecs[voiceIdx]
+        const filter = voiceFilters[voiceIdx]
+        const voiceGain = voiceGains[voiceIdx]
+
+        const freq =
+          spec.freqMin + Math.random() * (spec.freqMax - spec.freqMin)
+        filter.frequency.setValueAtTime(freq, now)
+
+        const attack = 0.05
+        const hold = 0.1 + Math.random() * 0.15
+        const release = 0.08 + Math.random() * 0.05
+        const silence = 0.2 + Math.random() * 0.6
+        const peak = 0.2 + Math.random() * 0.15
+
+        voiceGain.gain.setValueAtTime(0.0001, now)
+        voiceGain.gain.exponentialRampToValueAtTime(peak, now + attack)
+        voiceGain.gain.setValueAtTime(peak, now + attack + hold)
+        voiceGain.gain.exponentialRampToValueAtTime(
+          0.0001,
+          now + attack + hold + release,
+        )
+
+        const totalMs = (attack + hold + release + silence) * 1000
+        coffeeSyllableTimersRef.current[voiceIdx] = window.setTimeout(
+          () => scheduleNextSyllable(voiceIdx),
+          totalMs,
+        )
+      }
+
+      // Desfase inicial: si las tres voces arrancan en el mismo instante,
+      // sus primeras sílabas coinciden y suenan sincopadas.
+      const staggerDelays = [0, 180, 340]
+      for (let i = 0; i < 3; i++) {
+        coffeeSyllableTimersRef.current[i] = window.setTimeout(
+          () => scheduleNextSyllable(i),
+          staggerDelays[i],
+        )
+      }
     }
 
     allSourcesRef.current = sources
@@ -255,7 +318,6 @@ export function useAmbientMixer(
       const ctx = contextRef.current
       const gain = userGainsRef.current[id]
       if (ctx && gain) {
-        // 30ms de rampa para evitar clicks al mover el slider.
         gain.gain.setTargetAtTime(clamped, ctx.currentTime, 0.03)
       }
     },
@@ -267,6 +329,17 @@ export function useAmbientMixer(
       if (thunderTimerRef.current !== null) {
         window.clearTimeout(thunderTimerRef.current)
         thunderTimerRef.current = null
+      }
+      if (fireplaceCrackTimerRef.current !== null) {
+        window.clearTimeout(fireplaceCrackTimerRef.current)
+        fireplaceCrackTimerRef.current = null
+      }
+      for (let i = 0; i < coffeeSyllableTimersRef.current.length; i++) {
+        const t = coffeeSyllableTimersRef.current[i]
+        if (t !== null) {
+          window.clearTimeout(t)
+          coffeeSyllableTimersRef.current[i] = null
+        }
       }
       for (const source of allSourcesRef.current) {
         try {

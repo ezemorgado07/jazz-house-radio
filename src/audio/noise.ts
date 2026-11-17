@@ -57,36 +57,3 @@ export function generateBrownNoiseBuffer(
   return buffer
 }
 
-// Fireplace — pink noise suave como "glow" del fuego + crackles densos con
-// decay largo. Suena más cálido y lleno que un crackle de vinilo.
-export function generateFireplaceBuffer(
-  ctx: BaseAudioContext,
-  durationSec: number,
-  density = 0.003,
-): AudioBuffer {
-  const sampleRate = ctx.sampleRate
-  const length = Math.floor(sampleRate * durationSec)
-  const buffer = ctx.createBuffer(1, length, sampleRate)
-  const data = buffer.getChannelData(0)
-
-  // Capa base: pink noise atenuado — el "hiss" caliente del fuego.
-  const pinkBuf = generatePinkNoiseBuffer(ctx, durationSec)
-  const pinkData = pinkBuf.getChannelData(0)
-  for (let i = 0; i < length; i++) {
-    data[i] = pinkData[i] * 0.3
-  }
-
-  // Capa de crackles densos con decay exponencial largo (40 samples ~1ms a 44kHz).
-  for (let i = 0; i < length; i++) {
-    if (Math.random() < density) {
-      const amp = (Math.random() * 0.7 + 0.3) * (Math.random() < 0.5 ? -1 : 1)
-      for (let j = 0; j < 40 && i + j < length; j++) {
-        data[i + j] += amp * Math.exp(-j * 0.15)
-      }
-      // Saltar unos samples para no pisar el click actual.
-      i += 15
-    }
-  }
-
-  return buffer
-}
