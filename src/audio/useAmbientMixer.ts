@@ -15,6 +15,14 @@ const CHANNEL_DEFAULTS: AmbientChannel[] = [
 const BUFFER_SECONDS = 10
 const COFFEE_SAMPLE_URL = '/sounds/coffee-ambience.mp3'
 
+// Boost interno por canal: ajusta amplitud percibida para compensar que la
+// radio viene a nivel master más alto.
+const AMBIENT_GAIN_MULT: Record<AmbientChannelId, number> = {
+  rain: 1.0,
+  fireplace: 1.4,
+  coffee: 1.5,
+}
+
 type UserGainMap = Record<AmbientChannelId, GainNode | null>
 
 const emptyUserGains = (): UserGainMap => ({
@@ -289,7 +297,10 @@ export function useAmbientMixer(
       // su sample. En ambos la UI sigue mostrando el slider moviéndose
       // pero no sale audio.
       if (ctx && gain) {
-        gain.gain.setTargetAtTime(clamped, ctx.currentTime, 0.03)
+        // El state (channels[].volume) queda en el 0–1 del slider; el boost
+        // por canal se aplica recién acá, al setear el AudioParam.
+        const adjusted = clamped * AMBIENT_GAIN_MULT[id]
+        gain.gain.setTargetAtTime(adjusted, ctx.currentTime, 0.03)
       }
     },
     [buildChannels, contextRef],

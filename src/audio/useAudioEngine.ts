@@ -58,7 +58,8 @@ export function useAudioEngine(): AudioEngine {
 
     analyser.fftSize = 2048
     analyser.smoothingTimeConstant = 0.8
-    radioGain.gain.value = 1
+    // Baja la radio ~3dB para dejar "espacio" perceptual al ambiente
+    radioGain.gain.value = 0.7
     masterGain.gain.value = isMutedRef.current ? 0 : volumeRef.current
 
     // Cadena: el ambiente se mezclará DESPUÉS del analyser en un paso futuro,
