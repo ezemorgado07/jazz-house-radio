@@ -1,6 +1,9 @@
+import { ThemeSwitcher } from './components/ThemeSwitcher'
+
 function App() {
   return (
     <main className="min-h-screen grid place-items-center bg-[var(--bg)] px-6">
+      <ThemeSwitcher />
       <div className="text-center">
         <h1 className="text-5xl sm:text-7xl font-semibold tracking-tight text-[var(--accent)]">
           Jazz House Radio

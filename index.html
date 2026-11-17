@@ -8,6 +8,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      try {
+        var t = localStorage.getItem('jhr:theme');
+        if (t === 'midnight' || t === 'rainy' || t === 'vinyl') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
