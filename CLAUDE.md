@@ -128,6 +128,23 @@ En el cleanup de los `useEffect`:
 - `URL.revokeObjectURL()` para archivos locales.
 - `ctx.close()` el AudioContext (recurso finito del navegador).
 
+## Patrones descubiertos durante la implementación
+
+### Mirror refs para state que leen callbacks estables
+
+Cualquier state de React que necesite ser leído desde adentro de una callback con `useCallback(..., [])` o un `useEffect` con `[]` debe tener su "espejo" en un ref. Si no, la callback cierra sobre el valor inicial y lee uno stale cuando el state cambia. En el motor de audio esto aplica a `volumeRef` y `isMutedRef`, que acompañan a su `useState` y se actualizan en el mismo setter.
+
+Regla: si un valor de UI tiene que afectar un nodo de Web Audio desde una callback estable, duplicarlo en un ref.
+
+### Cleanup correcto del elemento `<audio>` que reproduce streams
+
+Pausar un `<audio>` no cierra el buffer de red: la conexión al stream queda abierta y el navegador sigue descargando en segundo plano. Al desmontar o cambiar de fuente, además de `pause()` hay que hacer:
+
+    el.removeAttribute('src')
+    el.load()
+
+Eso fuerza al elemento a soltar el buffer y cerrar la conexión. Importante para evitar leaks cuando el usuario navega o cuando cambiamos de estación.
+
 ## Convenciones
 
 - **Idioma del código:** inglés para identificadores (variables, funciones, archivos, componentes). Comentarios en español cuando ayuden a entender decisiones de diseño o las trampas.
