@@ -2,7 +2,7 @@ import type { AmbientChannelId, AmbientMixer } from '../../types'
 
 const CHANNEL_ICONS: Record<AmbientChannelId, string> = {
   rain: '🌧',
-  crackle: '💿',
+  fireplace: '🔥',
   coffee: '☕',
 }
 

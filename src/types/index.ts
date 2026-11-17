@@ -29,7 +29,7 @@ export interface AudioEngine {
   toggleMute: () => void
 }
 
-export type AmbientChannelId = 'rain' | 'crackle' | 'coffee'
+export type AmbientChannelId = 'rain' | 'fireplace' | 'coffee'
 
 export interface AmbientChannel {
   id: AmbientChannelId
