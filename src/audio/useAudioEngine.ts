@@ -26,7 +26,7 @@ export function useAudioEngine(): AudioEngine {
     master.gain.setTargetAtTime(target, ctx.currentTime, 0.02)
   }, [])
 
-  const ensureGraph = useCallback(async (): Promise<void> => {
+  const ensureReady = useCallback(async (): Promise<void> => {
     // Idempotente: si el grafo ya existe, solo despertamos el contexto.
     // Un AudioContext creado en una interacción previa puede volver a
     // 'suspended' después (background tab, bluetooth cambia de device, etc.).
@@ -86,7 +86,7 @@ export function useAudioEngine(): AudioEngine {
 
   const loadStream = useCallback(
     async (url: string) => {
-      await ensureGraph()
+      await ensureReady()
       const el = audioElRef.current
       if (!el) return
       if (objectUrlRef.current) {
@@ -102,12 +102,12 @@ export function useAudioEngine(): AudioEngine {
         setStatus('error')
       }
     },
-    [ensureGraph],
+    [ensureReady],
   )
 
   const loadLocalFile = useCallback(
     async (file: File) => {
-      await ensureGraph()
+      await ensureReady()
       const el = audioElRef.current
       if (!el) return
       if (objectUrlRef.current) {
@@ -124,11 +124,11 @@ export function useAudioEngine(): AudioEngine {
         setStatus('error')
       }
     },
-    [ensureGraph],
+    [ensureReady],
   )
 
   const play = useCallback(async () => {
-    await ensureGraph()
+    await ensureReady()
     const el = audioElRef.current
     if (!el || !el.src) return
     try {
@@ -136,7 +136,7 @@ export function useAudioEngine(): AudioEngine {
     } catch {
       setStatus('error')
     }
-  }, [ensureGraph])
+  }, [ensureReady])
 
   const pause = useCallback(() => {
     audioElRef.current?.pause()
@@ -212,6 +212,7 @@ export function useAudioEngine(): AudioEngine {
     analyserRef,
     contextRef,
     masterGainRef,
+    ensureReady,
     loadStream,
     loadLocalFile,
     play,

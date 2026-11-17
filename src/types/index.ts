@@ -19,6 +19,7 @@ export interface AudioEngine {
   analyserRef: RefObject<AnalyserNode | null>
   contextRef: RefObject<AudioContext | null>
   masterGainRef: RefObject<GainNode | null>
+  ensureReady: () => Promise<void>
   loadStream: (url: string) => Promise<void>
   loadLocalFile: (file: File) => Promise<void>
   play: () => Promise<void>
@@ -26,4 +27,17 @@ export interface AudioEngine {
   togglePlay: () => Promise<void>
   setVolume: (v: number) => void
   toggleMute: () => void
+}
+
+export type AmbientChannelId = 'rain' | 'crackle' | 'coffee'
+
+export interface AmbientChannel {
+  id: AmbientChannelId
+  label: string
+  volume: number
+}
+
+export interface AmbientMixer {
+  channels: AmbientChannel[]
+  setChannelVolume: (id: AmbientChannelId, volume: number) => Promise<void>
 }

@@ -2,12 +2,19 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ThemeSwitcher } from './components/ThemeSwitcher'
 import { Visualizer } from './components/Visualizer/Visualizer'
 import { StationList } from './components/StationList/StationList'
+import { AmbientMixer } from './components/AmbientMixer/AmbientMixer'
 import { useAudioEngine } from './audio/useAudioEngine'
+import { useAmbientMixer } from './audio/useAmbientMixer'
 import { useStations } from './radio/useStations'
 
 function App() {
   const engine = useAudioEngine()
   const stationApi = useStations()
+  const mixer = useAmbientMixer(
+    engine.contextRef,
+    engine.masterGainRef,
+    engine.ensureReady,
+  )
 
   const [fileName, setFileName] = useState<string | null>(null)
   const [consecutiveErrors, setConsecutiveErrors] = useState(0)
@@ -218,6 +225,8 @@ function App() {
             </label>
           </div>
         </section>
+
+        <AmbientMixer mixer={mixer} />
 
         <div className="text-xs uppercase tracking-wide">
           {skipping ? (
