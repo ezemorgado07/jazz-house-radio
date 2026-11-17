@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { ThemeSwitcher } from './components/ThemeSwitcher'
 import { Visualizer } from './components/Visualizer/Visualizer'
 import { StationList } from './components/StationList/StationList'
@@ -6,37 +6,103 @@ import { useAudioEngine } from './audio/useAudioEngine'
 import { useStations } from './radio/useStations'
 
 function App() {
-  const {
-    status,
-    volume,
-    isMuted,
-    analyserRef,
-    loadStream,
-    loadLocalFile,
-    togglePlay,
-    toggleMute,
-    setVolume,
-  } = useAudioEngine()
+  const engine = useAudioEngine()
   const stationApi = useStations()
-  const [fileName, setFileName] = useState<string | null>(null)
 
-  useEffect(() => {
-    // Al seleccionar estación (incluyendo el mount inicial) pedimos el stream.
-    // Si no hubo gesto de usuario aún, el browser bloqueará .play() con
-    // NotAllowedError y status quedará 'error' hasta el primer click.
-    void loadStream(stationApi.current.url)
-    setFileName(null)
-  }, [stationApi.current, loadStream])
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [consecutiveErrors, setConsecutiveErrors] = useState(0)
+
+  // Ref: cuál es la fuente activa — una estación (su id) o un archivo local
+  // (null). El auto-skip solo interviene cuando es una estación.
+  const activeStationIdRef = useRef<string | null>(null)
+  const skipTimerRef = useRef<number | null>(null)
+
+  const handleSelectStation = (id: string) => {
+    const s = stationApi.selectStation(id)
+    if (!s) return
+    activeStationIdRef.current = s.id
+    void engine.loadStream(s.url)
+  }
+
+  const handleNext = () => {
+    const s = stationApi.next()
+    activeStationIdRef.current = s.id
+    void engine.loadStream(s.url)
+  }
+
+  const handlePrev = () => {
+    const s = stationApi.prev()
+    activeStationIdRef.current = s.id
+    void engine.loadStream(s.url)
+  }
+
+  const handleLocalFile = (file: File) => {
+    activeStationIdRef.current = null
+    setFileName(file.name)
+    void engine.loadLocalFile(file)
+  }
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
-    setFileName(f.name)
-    void loadLocalFile(f)
+    handleLocalFile(f)
   }
 
-  const isPlaying = status === 'playing'
-  const isLoading = status === 'loading'
+  // Auto-skip en error: si la fuente activa es una estación y falla, saltar
+  // a la siguiente tras 1.5s, con cap para no loopear si todas fallan.
+  useEffect(() => {
+    if (engine.status === 'playing') {
+      setConsecutiveErrors(0)
+      return
+    }
+
+    if (
+      engine.status !== 'error' ||
+      activeStationIdRef.current === null
+    ) {
+      return
+    }
+
+    // Leemos el contador actual del closure y computamos el próximo valor.
+    // El effect solo se re-ejecuta por cambios en engine.status (ver deps),
+    // así que cada error dispara exactamente un incremento.
+    const nextCount = consecutiveErrors + 1
+    setConsecutiveErrors(nextCount)
+
+    if (nextCount >= stationApi.stations.length) {
+      console.warn('[jhr] all stations failed, stopping auto-skip')
+      return
+    }
+
+    skipTimerRef.current = window.setTimeout(() => {
+      const s = stationApi.next()
+      activeStationIdRef.current = s.id
+      void engine.loadStream(s.url)
+    }, 1500)
+
+    return () => {
+      if (skipTimerRef.current !== null) {
+        window.clearTimeout(skipTimerRef.current)
+        skipTimerRef.current = null
+      }
+    }
+    // Intencional: solo reaccionamos a status. El resto se lee del closure
+    // fresco o de refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [engine.status])
+
+  const isPlaying = engine.status === 'playing'
+  const isLoading = engine.status === 'loading'
+
+  const stationsFailed = stationApi.stations.length
+  const skipping =
+    engine.status === 'error' &&
+    activeStationIdRef.current !== null &&
+    consecutiveErrors < stationsFailed
+  const allFailed =
+    engine.status === 'error' &&
+    activeStationIdRef.current !== null &&
+    consecutiveErrors >= stationsFailed
 
   return (
     <main className="min-h-screen grid place-items-center bg-[var(--bg)] px-6 py-12">
@@ -51,19 +117,22 @@ function App() {
           </p>
         </div>
 
-        <Visualizer analyserRef={analyserRef} isActive={status === 'playing'} />
+        <Visualizer
+          analyserRef={engine.analyserRef}
+          isActive={engine.status === 'playing'}
+        />
 
         <StationList
           stations={stationApi.stations}
           currentId={stationApi.current.id}
-          onSelect={stationApi.selectStation}
+          onSelect={handleSelectStation}
         />
 
         <section className="flex w-full flex-col gap-5 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/60 p-6 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={stationApi.prev}
+              onClick={handlePrev}
               aria-label="Previous station"
               className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[var(--glass)] text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
@@ -72,7 +141,7 @@ function App() {
 
             <button
               type="button"
-              onClick={() => void togglePlay()}
+              onClick={() => void engine.togglePlay()}
               aria-label={isPlaying ? 'Pause' : 'Play'}
               aria-pressed={isPlaying}
               className={
@@ -96,7 +165,7 @@ function App() {
 
             <button
               type="button"
-              onClick={stationApi.next}
+              onClick={handleNext}
               aria-label="Next station"
               className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[var(--glass)] text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
@@ -110,17 +179,17 @@ function App() {
 
             <button
               type="button"
-              onClick={toggleMute}
-              aria-label={isMuted ? 'Unmute' : 'Mute'}
-              aria-pressed={isMuted}
+              onClick={engine.toggleMute}
+              aria-label={engine.isMuted ? 'Unmute' : 'Mute'}
+              aria-pressed={engine.isMuted}
               className={
                 'grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border transition-colors ' +
-                (isMuted
+                (engine.isMuted
                   ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--glass)]'
                   : 'border-[var(--border)] text-[var(--text)] bg-[var(--glass)] hover:border-[var(--accent)] hover:text-[var(--accent)]')
               }
             >
-              <span aria-hidden="true">{isMuted ? '🔇' : '🔊'}</span>
+              <span aria-hidden="true">{engine.isMuted ? '🔇' : '🔊'}</span>
             </button>
 
             <input
@@ -128,8 +197,8 @@ function App() {
               min="0"
               max="1"
               step="0.01"
-              value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
+              value={engine.volume}
+              onChange={(e) => engine.setVolume(Number(e.target.value))}
               aria-label="Volume"
               className="flex-1 cursor-pointer accent-[var(--accent)]"
             />
@@ -150,11 +219,25 @@ function App() {
           </div>
         </section>
 
-        <div className="text-xs uppercase tracking-wide text-[var(--text-dim)]">
-          <span>Status: </span>
-          <span className="text-[var(--text)]">{status}</span>
-          <span className="mx-2 text-[var(--border)]">·</span>
-          <span className="text-[var(--text)]">{stationApi.current.name}</span>
+        <div className="text-xs uppercase tracking-wide">
+          {skipping ? (
+            <span className="text-amber-400">
+              Status: Error — skipping to next…
+            </span>
+          ) : allFailed ? (
+            <span className="text-amber-400">
+              Status: All stations failed — try loading a local file
+            </span>
+          ) : (
+            <span className="text-[var(--text-dim)]">
+              <span>Status: </span>
+              <span className="text-[var(--text)]">{engine.status}</span>
+              <span className="mx-2 text-[var(--border)]">·</span>
+              <span className="text-[var(--text)]">
+                {stationApi.current.name}
+              </span>
+            </span>
+          )}
         </div>
       </div>
     </main>
