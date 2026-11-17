@@ -118,11 +118,14 @@ export function useAmbientMixer(
           thunderSrc.buffer = thunderBuf
           const thunderFilter = ctx.createBiquadFilter()
           thunderFilter.type = 'lowpass'
-          thunderFilter.frequency.value = 150
-          thunderFilter.Q.value = 2
+          // 350Hz entra dentro del rango útil de parlantes chicos; Q=1.5
+          // suena a retumbo en vez de a resonancia pura.
+          thunderFilter.frequency.value = 350
+          thunderFilter.Q.value = 1.5
           const envGain = ctx.createGain()
           envGain.gain.setValueAtTime(0, now)
-          envGain.gain.linearRampToValueAtTime(0.8, now + 0.1)
+          // Peak 1.0 compensa la energía perdida al filtrar tan abajo.
+          envGain.gain.linearRampToValueAtTime(1.0, now + 0.1)
           envGain.gain.exponentialRampToValueAtTime(0.001, now + 3)
 
           thunderSrc.connect(thunderFilter)
@@ -170,9 +173,13 @@ export function useAmbientMixer(
       userGainsRef.current.fireplace = userGain
 
       const scheduleWoodCrack = (): void => {
-        const delayMs = 12000 + Math.random() * 6000
+        const delayMs = 3000 + Math.random() * 4000 // 3–7 s entre cracks
         fireplaceCrackTimerRef.current = window.setTimeout(() => {
           const now = ctx.currentTime
+          // Pitch y volumen aleatorios por crack: suena a leña variada en
+          // vez de a clicks idénticos repetidos.
+          const freq = 2000 + Math.random() * 1500
+          const peak = 0.4 + Math.random() * 0.3
           // Buffer fresco por crack: cada click suena distinto en vez de
           // repetir la misma forma de onda cada vez.
           const crackBuf = generatePinkNoiseBuffer(ctx, 0.15)
@@ -180,11 +187,11 @@ export function useAmbientMixer(
           crackSrc.buffer = crackBuf
           const crackFilter = ctx.createBiquadFilter()
           crackFilter.type = 'bandpass'
-          crackFilter.frequency.value = 2800
+          crackFilter.frequency.value = freq
           crackFilter.Q.value = 4
           const envGain = ctx.createGain()
           envGain.gain.setValueAtTime(0.0001, now)
-          envGain.gain.linearRampToValueAtTime(0.5, now + 0.005)
+          envGain.gain.linearRampToValueAtTime(peak, now + 0.005)
           envGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3)
 
           crackSrc.connect(crackFilter)
@@ -201,10 +208,12 @@ export function useAmbientMixer(
     }
 
     // ============ COFFEE ============
-    // Room tone: brown → bandpass 500Hz → baseGain(0.35) → userGain
-    // 3 voces basadas en sílabas: cada una tiene una fuente pink compartida,
-    // su propio bandpass (frecuencia cambia por sílaba) y un voiceGain con
-    // envelope ADR disparado por un scheduler independiente con pausas.
+    // Room tone: brown → bandpass 500Hz → baseGain(0.15) → userGain.
+    // 3 voces basadas en sílabas: cada una tiene DOS bandpasses en paralelo
+    // (F1 y F2, los dos primeros formantes vocales) desde una fuente pink
+    // compartida. El scheduler elige una vocal del pool por sílaba y setea
+    // los dos filtros a sus frecuencias — así el timbre cambia como lo
+    // haría habla real en vez de ser un silbido modulado.
     {
       const brownBuf = generateBrownNoiseBuffer(ctx, BUFFER_SECONDS)
       const brownSrc = ctx.createBufferSource()
@@ -215,7 +224,7 @@ export function useAmbientMixer(
       brownFilter.frequency.value = 500
       brownFilter.Q.value = 0.9
       const baseGain = ctx.createGain()
-      baseGain.gain.value = 0.35
+      baseGain.gain.value = 0.15
       const userGain = ctx.createGain()
       userGain.gain.value = 0
 
@@ -230,54 +239,89 @@ export function useAmbientMixer(
       userGainsRef.current.coffee = userGain
 
       const sharedPink = generatePinkNoiseBuffer(ctx, BUFFER_SECONDS)
-      const voiceSpecs = [
-        { freqMin: 350, freqMax: 700, q: 10 },
-        { freqMin: 550, freqMax: 1100, q: 12 },
-        { freqMin: 1300, freqMax: 2700, q: 14 },
+      // Cada vocal es [F1, F2] en Hz. 5 vocales por voz; el scheduler elige
+      // una al azar por sílaba.
+      const vowelPools: ReadonlyArray<ReadonlyArray<readonly [number, number]>> = [
+        // Voice 0 — grave/masculina
+        [
+          [700, 1100],
+          [500, 900],
+          [450, 850],
+          [600, 1000],
+          [550, 1150],
+        ],
+        // Voice 1 — media
+        [
+          [800, 1400],
+          [550, 1300],
+          [700, 1500],
+          [500, 1800],
+          [650, 1250],
+        ],
+        // Voice 2 — aguda/femenina
+        [
+          [1000, 1900],
+          [650, 2200],
+          [900, 2400],
+          [700, 2100],
+          [850, 2000],
+        ],
       ]
-      const voiceFilters: BiquadFilterNode[] = []
+
+      const voiceF1Filters: BiquadFilterNode[] = []
+      const voiceF2Filters: BiquadFilterNode[] = []
       const voiceGains: GainNode[] = []
 
-      for (const spec of voiceSpecs) {
+      for (let i = 0; i < 3; i++) {
         const vSrc = ctx.createBufferSource()
         vSrc.buffer = sharedPink
         vSrc.loop = true
-        const filter = ctx.createBiquadFilter()
-        filter.type = 'bandpass'
-        filter.Q.value = spec.q
-        // Frecuencia inicial: central del rango. Se cambia por sílaba.
-        filter.frequency.value = (spec.freqMin + spec.freqMax) / 2
+
+        // Dos bandpasses en paralelo con Q más ancho (5): juntos arman el
+        // par de formantes de una vocal. Q más alto antes suena a silbato.
+        const f1Filter = ctx.createBiquadFilter()
+        f1Filter.type = 'bandpass'
+        f1Filter.Q.value = 5
+        const f2Filter = ctx.createBiquadFilter()
+        f2Filter.type = 'bandpass'
+        f2Filter.Q.value = 5
+        const [initF1, initF2] = vowelPools[i][0]
+        f1Filter.frequency.value = initF1
+        f2Filter.frequency.value = initF2
+
         const voiceGain = ctx.createGain()
-        // exponentialRampToValueAtTime no acepta 0, usamos un valor minúsculo.
         voiceGain.gain.value = 0.0001
 
-        vSrc.connect(filter)
-        filter.connect(voiceGain)
+        // El mismo src alimenta los dos filtros en paralelo; ambos filtros
+        // suman en voiceGain (dos connect() al mismo destination).
+        vSrc.connect(f1Filter)
+        f1Filter.connect(voiceGain)
+        vSrc.connect(f2Filter)
+        f2Filter.connect(voiceGain)
         voiceGain.connect(userGain)
 
         vSrc.start(0)
         sources.push(vSrc)
-        nodes.push(vSrc, filter, voiceGain)
-        voiceFilters.push(filter)
+        nodes.push(vSrc, f1Filter, f2Filter, voiceGain)
+        voiceF1Filters.push(f1Filter)
+        voiceF2Filters.push(f2Filter)
         voiceGains.push(voiceGain)
       }
 
       const scheduleNextSyllable = (voiceIdx: number): void => {
         const now = ctx.currentTime
-        const spec = voiceSpecs[voiceIdx]
-        const filter = voiceFilters[voiceIdx]
-        const voiceGain = voiceGains[voiceIdx]
-
-        const freq =
-          spec.freqMin + Math.random() * (spec.freqMax - spec.freqMin)
-        filter.frequency.setValueAtTime(freq, now)
+        const pool = vowelPools[voiceIdx]
+        const [f1, f2] = pool[Math.floor(Math.random() * pool.length)]
+        voiceF1Filters[voiceIdx].frequency.setValueAtTime(f1, now)
+        voiceF2Filters[voiceIdx].frequency.setValueAtTime(f2, now)
 
         const attack = 0.05
         const hold = 0.1 + Math.random() * 0.15
         const release = 0.08 + Math.random() * 0.05
-        const silence = 0.2 + Math.random() * 0.6
-        const peak = 0.2 + Math.random() * 0.15
+        const silence = 0.2 + Math.random() * 0.5
+        const peak = 0.4 + Math.random() * 0.2
 
+        const voiceGain = voiceGains[voiceIdx]
         voiceGain.gain.setValueAtTime(0.0001, now)
         voiceGain.gain.exponentialRampToValueAtTime(peak, now + attack)
         voiceGain.gain.setValueAtTime(peak, now + attack + hold)
@@ -293,9 +337,9 @@ export function useAmbientMixer(
         )
       }
 
-      // Desfase inicial: si las tres voces arrancan en el mismo instante,
-      // sus primeras sílabas coinciden y suenan sincopadas.
-      const staggerDelays = [0, 180, 340]
+      // Desfase inicial un poco más amplio para que las primeras tres
+      // sílabas no se apilen.
+      const staggerDelays = [0, 220, 480]
       for (let i = 0; i < 3; i++) {
         coffeeSyllableTimersRef.current[i] = window.setTimeout(
           () => scheduleNextSyllable(i),
