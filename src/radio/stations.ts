@@ -1,0 +1,58 @@
+import type { Station } from '../types'
+
+export const CURATED_STATIONS: readonly Station[] = [
+  {
+    id: 'somafm-illstreet',
+    name: 'Illinois Street Lounge',
+    url: 'https://ice1.somafm.com/illstreet-128-mp3',
+    tags: 'downtempo, lounge, jazz',
+    bitrate: 128,
+    codec: 'MP3',
+    homepage: 'https://somafm.com/illstreet/',
+  },
+  {
+    id: 'somafm-groovesalad',
+    name: 'Groove Salad',
+    url: 'https://ice1.somafm.com/groovesalad-128-mp3',
+    tags: 'downtempo, chillout, nu-jazz',
+    bitrate: 128,
+    codec: 'MP3',
+    homepage: 'https://somafm.com/groovesalad/',
+  },
+  {
+    id: 'somafm-secretagent',
+    name: 'Secret Agent',
+    url: 'https://ice1.somafm.com/secretagent-128-mp3',
+    tags: 'spy jazz, lounge, cocktail',
+    bitrate: 128,
+    codec: 'MP3',
+    homepage: 'https://somafm.com/secretagent/',
+  },
+  {
+    id: 'somafm-fluid',
+    name: 'Fluid',
+    url: 'https://ice1.somafm.com/fluid-128-mp3',
+    tags: 'instrumental hip hop, downtempo',
+    bitrate: 128,
+    codec: 'MP3',
+    homepage: 'https://somafm.com/fluid/',
+  },
+  {
+    id: 'radioparadise-mellow',
+    name: 'Radio Paradise — Mellow',
+    url: 'https://stream.radioparadise.com/mellow-128',
+    tags: 'mellow mix, eclectic',
+    bitrate: 128,
+    codec: 'MP3',
+    homepage: 'https://radioparadise.com/',
+  },
+  {
+    id: 'somafm-deepspaceone',
+    name: 'Deep Space One',
+    url: 'https://ice1.somafm.com/deepspaceone-128-mp3',
+    tags: 'ambient, space',
+    bitrate: 128,
+    codec: 'MP3',
+    homepage: 'https://somafm.com/deepspaceone/',
+  },
+] as const

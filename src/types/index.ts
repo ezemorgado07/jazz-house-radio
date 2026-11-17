@@ -2,6 +2,16 @@ import type { RefObject } from 'react'
 
 export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error'
 
+export interface Station {
+  id: string
+  name: string
+  url: string
+  tags: string
+  bitrate?: number
+  codec?: string
+  homepage?: string
+}
+
 export interface AudioEngine {
   status: PlaybackStatus
   volume: number
