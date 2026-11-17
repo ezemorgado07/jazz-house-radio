@@ -206,7 +206,7 @@ function App() {
               step="0.01"
               value={engine.volume}
               onChange={(e) => engine.setVolume(Number(e.target.value))}
-              aria-label="Volume"
+              aria-label="Radio volume"
               className="flex-1 cursor-pointer accent-[var(--accent)]"
             />
           </div>

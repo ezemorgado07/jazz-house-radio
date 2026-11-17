@@ -18,11 +18,20 @@ export function useAudioEngine(): AudioEngine {
   const isMutedRef = useRef(false)
   const objectUrlRef = useRef<string | null>(null)
 
-  const rampGain = useCallback((target: number) => {
+  // Rampas exponenciales cortas para evitar clicks al cambiar volumen o mutear.
+  // Dos helpers separados porque ahora el slider y el mute apuntan a nodos
+  // distintos del grafo.
+  const rampRadioGain = useCallback((target: number) => {
+    const ctx = contextRef.current
+    const radio = radioGainRef.current
+    if (!ctx || !radio) return
+    radio.gain.setTargetAtTime(target, ctx.currentTime, 0.02)
+  }, [])
+
+  const rampMasterGain = useCallback((target: number) => {
     const ctx = contextRef.current
     const master = masterGainRef.current
     if (!ctx || !master) return
-    // Rampa exponencial corta para evitar clicks al cambiar volumen o mutear.
     master.gain.setTargetAtTime(target, ctx.currentTime, 0.02)
   }, [])
 
@@ -58,9 +67,13 @@ export function useAudioEngine(): AudioEngine {
 
     analyser.fftSize = 2048
     analyser.smoothingTimeConstant = 0.8
-    // Baja la radio ~3dB para dejar "espacio" perceptual al ambiente
-    radioGain.gain.value = 0.7
-    masterGain.gain.value = isMutedRef.current ? 0 : volumeRef.current
+    // Reparto de responsabilidades en el grafo:
+    //  - radioGain lo controla el slider "Radio" del Player.
+    //  - masterGain queda dedicado al mute (1 o 0) y no cambia por volumen.
+    // Los ambient channels entran al masterGain después del analyser, así
+    // que también quedan silenciados por el mute pero no por el slider de radio.
+    radioGain.gain.value = isMutedRef.current ? 0 : volumeRef.current
+    masterGain.gain.value = isMutedRef.current ? 0 : 1
 
     // Cadena: el ambiente se mezclará DESPUÉS del analyser en un paso futuro,
     // para que el visualizador reaccione solo a la música de la radio.
@@ -157,19 +170,22 @@ export function useAudioEngine(): AudioEngine {
       const clamped = Math.max(0, Math.min(1, v))
       volumeRef.current = clamped
       setVolumeState(clamped)
-      if (!isMutedRef.current) {
-        rampGain(clamped)
-      }
+      // Siempre apuntamos a radioGain. Si está muted, masterGain=0 ya
+      // garantiza silencio, y al desmutear la radio sale al nuevo nivel.
+      rampRadioGain(clamped)
     },
-    [rampGain],
+    [rampRadioGain],
   )
 
   const toggleMute = useCallback(() => {
     const next = !isMutedRef.current
     isMutedRef.current = next
     setIsMuted(next)
-    rampGain(next ? 0 : volumeRef.current)
-  }, [rampGain])
+    // El mute vive en el masterGain — silencia TODO (radio + ambient) sin
+    // tocar los niveles individuales, así al desmutear volvemos exactamente
+    // a la mezcla previa.
+    rampMasterGain(next ? 0 : 1)
+  }, [rampMasterGain])
 
   useEffect(() => {
     return () => {
