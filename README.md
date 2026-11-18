@@ -2,7 +2,7 @@
 
 > A lo-fi radio player with a reactive visualizer and ambient mixer — all client-side, built with React 19 + Web Audio API.
 
-**🎵 [Live demo](https://TBD-link.vercel.app)** *(placeholder — se completa después del deploy)*
+**🎵 [Live demo](https://jazz-house-radio.vercel.app)**
 
 ![Screenshot placeholder](./docs/screenshot.png) *(placeholder — se agrega al final)*
 
@@ -89,6 +89,10 @@ Ver `CLAUDE.md` para el detalle completo y las trampas específicas de Web Audio
 ## License
 
 MIT
+
+---
+
+[![Deployed on Vercel](https://img.shields.io/badge/deployed_on-vercel-black?logo=vercel)](https://jazz-house-radio.vercel.app)
 
 ---
 
