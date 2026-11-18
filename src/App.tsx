@@ -112,14 +112,14 @@ function App() {
     consecutiveErrors >= stationsFailed
 
   return (
-    <main className="min-h-screen grid place-items-center bg-[var(--bg)] px-6 py-12">
+    <main className="min-h-screen grid place-items-center bg-[var(--bg)] px-4 py-12 sm:px-6">
       <ThemeSwitcher />
       <div className="flex w-full max-w-xl flex-col items-center gap-8">
         <div className="text-center">
-          <h1 className="text-5xl sm:text-6xl font-semibold tracking-tight text-[var(--accent)]">
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--accent)] sm:text-5xl md:text-6xl">
             Jazz House Radio
           </h1>
-          <p className="mt-3 text-sm text-[var(--text-dim)]">
+          <p className="mt-3 text-sm text-[var(--text-dim)] sm:text-base">
             Late night jazz house, selected and streaming
           </p>
         </div>
@@ -141,7 +141,7 @@ function App() {
               type="button"
               onClick={handlePrev}
               aria-label="Previous station"
-              className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[var(--glass)] text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[var(--glass)] text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] sm:h-10 sm:w-10"
             >
               <span aria-hidden="true">⟨</span>
             </button>
@@ -152,7 +152,7 @@ function App() {
               aria-label={isPlaying ? 'Pause' : 'Play'}
               aria-pressed={isPlaying}
               className={
-                'grid h-12 w-12 shrink-0 cursor-pointer place-items-center rounded-full border transition-colors ' +
+                'grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border transition-colors sm:h-12 sm:w-12 ' +
                 (isPlaying
                   ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--glass)]'
                   : 'border-[var(--border)] text-[var(--text)] bg-[var(--glass)] hover:border-[var(--accent)] hover:text-[var(--accent)]')
@@ -174,7 +174,7 @@ function App() {
               type="button"
               onClick={handleNext}
               aria-label="Next station"
-              className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[var(--glass)] text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border border-[var(--border)] bg-[var(--glass)] text-[var(--text)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] sm:h-10 sm:w-10"
             >
               <span aria-hidden="true">⟩</span>
             </button>
@@ -190,7 +190,7 @@ function App() {
               aria-label={engine.isMuted ? 'Unmute' : 'Mute'}
               aria-pressed={engine.isMuted}
               className={
-                'grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border transition-colors ' +
+                'grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border transition-colors sm:h-10 sm:w-10 ' +
                 (engine.isMuted
                   ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--glass)]'
                   : 'border-[var(--border)] text-[var(--text)] bg-[var(--glass)] hover:border-[var(--accent)] hover:text-[var(--accent)]')
@@ -207,7 +207,9 @@ function App() {
               value={engine.volume}
               onChange={(e) => engine.setVolume(Number(e.target.value))}
               aria-label="Radio volume"
-              className="flex-1 cursor-pointer accent-[var(--accent)]"
+              // min-w-0 evita que el input de tipo range imponga su min-content
+              // y empuje a los botones fuera del contenedor en viewports chicos.
+              className="min-w-0 flex-1 cursor-pointer accent-[var(--accent)]"
             />
           </div>
 

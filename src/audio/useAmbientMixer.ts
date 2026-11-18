@@ -17,10 +17,17 @@ const COFFEE_SAMPLE_URL = '/sounds/coffee-ambience.mp3'
 
 // Boost interno por canal: ajusta amplitud percibida para compensar que la
 // radio viene a nivel master más alto.
+// Objetivo: al 60% de slider los tres canales deben sonar a loudness similar.
+// - rain 0.5: la pink noise con highpass a 1kHz concentra energía en agudos
+//   (muy sensibles al oído) y se percibía más fuerte que el resto.
+// - fireplace 1.4: el pink + lowpass 800Hz ya va atenuado por baseGain(0.15),
+//   necesita este boost para equilibrarse.
+// - coffee 2.5: el sample real está grabado bajo. Si al 100% clippea feo,
+//   bajar a 2.2 (ver nota en CLAUDE.md sobre mastering del sample).
 const AMBIENT_GAIN_MULT: Record<AmbientChannelId, number> = {
-  rain: 1.0,
+  rain: 0.5,
   fireplace: 1.4,
-  coffee: 1.5,
+  coffee: 2.5,
 }
 
 type UserGainMap = Record<AmbientChannelId, GainNode | null>

@@ -24,7 +24,7 @@ export function AmbientMixer({ mixer }: AmbientMixerProps) {
             <div key={c.id} className="flex items-center gap-3 py-2">
               <div
                 className={
-                  'flex w-24 shrink-0 items-center gap-2 text-sm transition-colors ' +
+                  'flex w-20 shrink-0 items-center gap-2 text-sm transition-colors sm:w-24 ' +
                   (active
                     ? 'text-[var(--accent)]'
                     : 'text-[var(--text-dim)]')

@@ -28,7 +28,7 @@ export function StationList({
               aria-selected={active}
               onClick={() => onSelect(s.id)}
               className={
-                'flex min-w-[220px] max-w-[220px] shrink-0 snap-start cursor-pointer flex-col gap-1 rounded-xl border px-4 py-3 text-left backdrop-blur-md transition-colors ' +
+                'flex min-w-[180px] max-w-[180px] shrink-0 snap-start cursor-pointer flex-col gap-1 rounded-xl border px-4 py-3 text-left backdrop-blur-md transition-colors sm:min-w-[220px] sm:max-w-[220px] ' +
                 (active
                   ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--text)]'
                   : 'border-[var(--border)] bg-[var(--surface)]/60 text-[var(--text)] hover:border-[var(--accent)]/40')
