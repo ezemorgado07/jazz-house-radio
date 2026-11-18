@@ -4,6 +4,7 @@ export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error'
 
 export type Genre =
   | 'jazz'
+  | 'nu-jazz'
   | 'lofi'
   | 'bossa'
   | 'deep-house'
