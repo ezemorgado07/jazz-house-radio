@@ -50,4 +50,5 @@ export interface AmbientChannel {
 export interface AmbientMixer {
   channels: AmbientChannel[]
   setChannelVolume: (id: AmbientChannelId, volume: number) => Promise<void>
+  primeIfStored: () => Promise<void>
 }

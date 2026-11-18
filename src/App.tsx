@@ -6,6 +6,7 @@ import { AmbientMixer } from './components/AmbientMixer/AmbientMixer'
 import { useAudioEngine } from './audio/useAudioEngine'
 import { useAmbientMixer } from './audio/useAmbientMixer'
 import { useStations } from './radio/useStations'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
 
 function App() {
   const engine = useAudioEngine()
@@ -54,6 +55,25 @@ function App() {
     if (!f) return
     handleLocalFile(f)
   }
+
+  useKeyboardShortcuts({
+    onTogglePlay: () => void engine.togglePlay(),
+    onToggleMute: engine.toggleMute,
+    onNext: handleNext,
+    onPrev: handlePrev,
+  })
+
+  // Auto-prime ambient desde storage: cuando engine.status sale de 'idle' por
+  // primera vez (cualquier gesto del usuario desbloqueó el AudioContext),
+  // arrancamos los canales que tengan volumen guardado > 0. One-shot via ref
+  // para no re-disparar en cada transición de status.
+  const hasPrimedAmbientRef = useRef(false)
+  useEffect(() => {
+    if (hasPrimedAmbientRef.current) return
+    if (engine.status === 'idle') return
+    hasPrimedAmbientRef.current = true
+    void mixer.primeIfStored()
+  }, [engine.status, mixer])
 
   // Auto-skip en error: si la fuente activa es una estación y falla, saltar
   // a la siguiente tras 1.5s, con cap para no loopear si todas fallan.
@@ -249,6 +269,21 @@ function App() {
               </span>
             </span>
           )}
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="hidden items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-[var(--text-dim)] sm:flex"
+        >
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">Space</kbd>
+          <span>play</span>
+          <span className="text-[var(--border)]">·</span>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">M</kbd>
+          <span>mute</span>
+          <span className="text-[var(--border)]">·</span>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">←</kbd>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">→</kbd>
+          <span>station</span>
         </div>
       </div>
     </main>

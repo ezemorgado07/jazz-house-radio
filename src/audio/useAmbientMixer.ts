@@ -6,14 +6,48 @@ import type {
 } from '../types'
 import { generatePinkNoiseBuffer } from './noise'
 
-const CHANNEL_DEFAULTS: AmbientChannel[] = [
-  { id: 'rain', label: 'Rain', volume: 0 },
-  { id: 'fireplace', label: 'Fireplace', volume: 0 },
-  { id: 'coffee', label: 'Café murmur', volume: 0 },
-]
+const CHANNEL_LABELS: Record<AmbientChannelId, string> = {
+  rain: 'Rain',
+  fireplace: 'Fireplace',
+  coffee: 'Café murmur',
+}
 
 const BUFFER_SECONDS = 10
 const COFFEE_SAMPLE_URL = '/sounds/coffee-ambience.mp3'
+
+const STORAGE_KEY = 'jhr:ambient'
+
+type AmbientVolumes = Record<AmbientChannelId, number>
+
+const DEFAULT_VOLUMES: AmbientVolumes = {
+  rain: 0,
+  fireplace: 0,
+  coffee: 0,
+}
+
+// Lee los volúmenes guardados del localStorage. Type-guard por canal: si un
+// valor viene corrupto (no number, NaN, fuera de rango) cae al default de ese
+// canal específico — no al default completo. Envuelto en try/catch para
+// Safari private mode, donde localStorage puede tirar al leer.
+function readStoredAmbient(): AmbientVolumes {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return DEFAULT_VOLUMES
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return DEFAULT_VOLUMES
+    const map = parsed as Record<string, unknown>
+    const out: AmbientVolumes = { ...DEFAULT_VOLUMES }
+    for (const key of Object.keys(DEFAULT_VOLUMES) as AmbientChannelId[]) {
+      const v = map[key]
+      if (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1) {
+        out[key] = v
+      }
+    }
+    return out
+  } catch {
+    return DEFAULT_VOLUMES
+  }
+}
 
 // Boost interno por canal: ajusta amplitud percibida para compensar que la
 // radio viene a nivel master más alto.
@@ -43,7 +77,22 @@ export function useAmbientMixer(
   masterGainRef: RefObject<GainNode | null>,
   ensureReady: () => Promise<void>,
 ): AmbientMixer {
-  const [channels, setChannels] = useState<AmbientChannel[]>(CHANNEL_DEFAULTS)
+  const [channels, setChannels] = useState<AmbientChannel[]>(() => {
+    const stored = readStoredAmbient()
+    return [
+      { id: 'rain', label: CHANNEL_LABELS.rain, volume: stored.rain },
+      { id: 'fireplace', label: CHANNEL_LABELS.fireplace, volume: stored.fireplace },
+      { id: 'coffee', label: CHANNEL_LABELS.coffee, volume: stored.coffee },
+    ]
+  })
+
+  // Mirror ref de channels: primeIfStored es useCallback con deps estables y
+  // necesita leer los volúmenes al momento de ejecutarse, no los del closure
+  // de cuando fue creado. Mismo patrón que volumeRef/isMutedRef del motor.
+  const channelsRef = useRef<AmbientChannel[]>(channels)
+  useEffect(() => {
+    channelsRef.current = channels
+  }, [channels])
 
   // Centralizamos tracking: todo lo start-able a allSourcesRef, todo lo
   // conectable a allNodesRef. Los userGain por canal van en un map para que
@@ -59,6 +108,20 @@ export function useAmbientMixer(
   const fireplaceCrackTimerRef = useRef<number | null>(null)
   const coffeeLoadedRef = useRef(false)
   const isInitializedRef = useRef(false)
+
+  // Persistencia: escribe los volúmenes a localStorage en cada cambio. Es un
+  // snapshot plano {id: volume}; no persistimos label porque es UI concern.
+  useEffect(() => {
+    try {
+      const snapshot: Record<string, number> = {}
+      for (const c of channels) {
+        snapshot[c.id] = c.volume
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+    } catch {
+      // Safari private mode, cuota llena, etc. — ignorar.
+    }
+  }, [channels])
 
   const buildChannels = useCallback(async (): Promise<void> => {
     if (isInitializedRef.current) return
@@ -290,6 +353,26 @@ export function useAmbientMixer(
     allNodesRef.current = nodes
   }, [contextRef, masterGainRef, ensureReady])
 
+  // Bonus: si cargamos la app con algún canal en >0 desde el storage, no
+  // podemos arrancar audio hasta que haya user gesture (autoplay policy).
+  // App.tsx observa engine.status; cuando sale de 'idle' significa que el
+  // usuario ya desbloqueó el AudioContext (vía play, selección de estación,
+  // etc.), entonces llama acá para que los canales stored arranquen solos.
+  const primeIfStored = useCallback(async (): Promise<void> => {
+    const current = channelsRef.current
+    if (!current.some((c) => c.volume > 0)) return
+    await buildChannels()
+    const ctx = contextRef.current
+    if (!ctx) return
+    for (const ch of current) {
+      const gain = userGainsRef.current[ch.id]
+      if (gain && ch.volume > 0) {
+        const adjusted = ch.volume * AMBIENT_GAIN_MULT[ch.id]
+        gain.gain.setTargetAtTime(adjusted, ctx.currentTime, 0.03)
+      }
+    }
+  }, [buildChannels, contextRef])
+
   const setChannelVolume = useCallback(
     async (id: AmbientChannelId, volume: number): Promise<void> => {
       await buildChannels()
@@ -349,5 +432,5 @@ export function useAmbientMixer(
     }
   }, [])
 
-  return { channels, setChannelVolume }
+  return { channels, setChannelVolume, primeIfStored }
 }
