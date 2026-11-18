@@ -7,6 +7,9 @@ import { useAudioEngine } from './audio/useAudioEngine'
 import { useAmbientMixer } from './audio/useAmbientMixer'
 import { useStations } from './radio/useStations'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import type { VisualizerMode } from './components/Visualizer/Visualizer'
+
+const VISUALIZER_MODE_KEY = 'jhr:visualizer-mode'
 
 function App() {
   const engine = useAudioEngine()
@@ -19,6 +22,22 @@ function App() {
 
   const [fileName, setFileName] = useState<string | null>(null)
   const [consecutiveErrors, setConsecutiveErrors] = useState(0)
+  const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>(() => {
+    try {
+      const stored = localStorage.getItem(VISUALIZER_MODE_KEY)
+      return stored === 'vinyl' ? 'vinyl' : 'spectrum'
+    } catch {
+      return 'spectrum'
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VISUALIZER_MODE_KEY, visualizerMode)
+    } catch {
+      // Safari private mode, cuota llena — ignorar
+    }
+  }, [visualizerMode])
 
   // Ref: cuál es la fuente activa — una estación (su id) o un archivo local
   // (null). El auto-skip solo interviene cuando es una estación.
@@ -144,10 +163,41 @@ function App() {
           </p>
         </div>
 
-        <Visualizer
-          analyserRef={engine.analyserRef}
-          isActive={engine.status === 'playing'}
-        />
+        <div className="relative w-full">
+          <Visualizer
+            analyserRef={engine.analyserRef}
+            isActive={engine.status === 'playing'}
+            mode={visualizerMode}
+          />
+          <div className="absolute top-3 right-3 z-10 flex gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 p-1 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => setVisualizerMode('spectrum')}
+              aria-pressed={visualizerMode === 'spectrum'}
+              className={
+                'cursor-pointer rounded-full px-3 py-1 text-xs transition-colors ' +
+                (visualizerMode === 'spectrum'
+                  ? 'bg-[var(--accent)] text-[var(--bg)]'
+                  : 'text-[var(--text-dim)] hover:text-[var(--text)]')
+              }
+            >
+              Spectrum
+            </button>
+            <button
+              type="button"
+              onClick={() => setVisualizerMode('vinyl')}
+              aria-pressed={visualizerMode === 'vinyl'}
+              className={
+                'cursor-pointer rounded-full px-3 py-1 text-xs transition-colors ' +
+                (visualizerMode === 'vinyl'
+                  ? 'bg-[var(--accent)] text-[var(--bg)]'
+                  : 'text-[var(--text-dim)] hover:text-[var(--text)]')
+              }
+            >
+              Vinyl
+            </button>
+          </div>
+        </div>
 
         <StationList
           stations={stationApi.stations}
