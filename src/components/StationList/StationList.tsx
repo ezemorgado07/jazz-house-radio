@@ -42,9 +42,14 @@ export function StationList({
                   </span>
                 )}
               </div>
-              <span className="truncate text-xs text-[var(--text-dim)]">
-                {s.tags}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="shrink-0 rounded bg-[var(--accent)]/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--accent)]">
+                  {s.genre}
+                </span>
+                <span className="truncate text-xs text-[var(--text-dim)]">
+                  {s.tags}
+                </span>
+              </div>
             </button>
           )
         })}

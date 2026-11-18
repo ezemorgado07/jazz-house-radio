@@ -2,11 +2,20 @@ import type { RefObject } from 'react'
 
 export type PlaybackStatus = 'idle' | 'loading' | 'playing' | 'paused' | 'error'
 
+export type Genre =
+  | 'jazz'
+  | 'lofi'
+  | 'bossa'
+  | 'deep-house'
+  | 'techno'
+  | 'eclectic'
+
 export interface Station {
   id: string
   name: string
   url: string
   tags: string
+  genre: Genre
   bitrate?: number
   codec?: string
   homepage?: string
