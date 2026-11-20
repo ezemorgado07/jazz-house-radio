@@ -35,18 +35,18 @@ export function StationList({
               }
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium">{s.name}</span>
+                <span className="truncate font-sans text-sm font-medium">{s.name}</span>
                 {s.bitrate !== undefined && (
-                  <span className="shrink-0 rounded-full border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-dim)]">
+                  <span className="shrink-0 rounded-full border border-[var(--border)] px-1.5 py-0.5 font-[var(--font-mono)] text-[10px] font-medium uppercase tracking-wide text-[var(--text-dim)]">
                     {s.bitrate}k
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="shrink-0 rounded bg-[var(--accent)]/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-[var(--accent)]">
+                <span className="shrink-0 rounded bg-[var(--accent)]/15 px-1.5 py-0.5 font-[var(--font-mono)] text-[10px] uppercase tracking-wider text-[var(--accent)]">
                   {s.genre}
                 </span>
-                <span className="truncate text-xs text-[var(--text-dim)]">
+                <span className="truncate font-sans text-xs text-[var(--text-dim)]">
                   {s.tags}
                 </span>
               </div>

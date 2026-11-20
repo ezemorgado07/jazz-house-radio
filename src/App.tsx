@@ -155,10 +155,10 @@ function App() {
       <ThemeSwitcher />
       <div className="flex w-full max-w-xl flex-col items-center gap-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--accent)] sm:text-5xl md:text-6xl">
+          <h1 className="font-[var(--font-display)] text-5xl font-normal tracking-tight text-[var(--accent)] sm:text-6xl md:text-7xl">
             Jazz House Radio
           </h1>
-          <p className="mt-3 text-sm text-[var(--text-dim)] sm:text-base">
+          <p className="mt-3 text-sm italic text-[var(--text-dim)] sm:text-base">
             Late night jazz house, selected and streaming
           </p>
         </div>
@@ -300,7 +300,7 @@ function App() {
 
         <AmbientMixer mixer={mixer} />
 
-        <div className="text-xs uppercase tracking-wide">
+        <div className="font-[var(--font-mono)] text-xs uppercase tracking-widest">
           {skipping ? (
             <span className="text-amber-400">
               Status: Error — skipping to next…
@@ -325,14 +325,14 @@ function App() {
           aria-hidden="true"
           className="hidden items-center justify-center gap-2 text-[10px] uppercase tracking-wider text-[var(--text-dim)] sm:flex"
         >
-          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">Space</kbd>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-[var(--font-mono)]">Space</kbd>
           <span>play</span>
           <span className="text-[var(--border)]">·</span>
-          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">M</kbd>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-[var(--font-mono)]">M</kbd>
           <span>mute</span>
           <span className="text-[var(--border)]">·</span>
-          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">←</kbd>
-          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5">→</kbd>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-[var(--font-mono)]">←</kbd>
+          <kbd className="rounded bg-[var(--surface)] px-1.5 py-0.5 font-[var(--font-mono)]">→</kbd>
           <span>station</span>
         </div>
       </div>
