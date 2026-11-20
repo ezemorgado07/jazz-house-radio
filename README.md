@@ -28,23 +28,9 @@
 - **Gráficos:** HTML5 Canvas 2D + `requestAnimationFrame`
 - **Fuentes de streams:** Radio Paradise
 
-## Quick start
+## Run locally
 
-```bash
-git clone https://github.com/USERNAME/jazz-house-radio.git
-cd jazz-house-radio
-npm install
-npm run dev
-```
-
-Open http://localhost:5173
-
-## Build for production
-
-```bash
-npm run build
-npm run preview
-```
+Standard Vite. `npm install && npm run dev`. The ambient mixer needs a `.mp3` at `public/sounds/coffee-ambience.mp3` — any café ambience loop works.
 
 ## Architecture highlights
 
